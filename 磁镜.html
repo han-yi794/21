@@ -1,0 +1,1195 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>磁镜装置 - 粒子运动模拟</title>
+    <style>
+        :root {
+            --bg: #0a0a14;
+            --panel-bg: rgba(16, 16, 32, 0.94);
+            --text: #d0d0e0;
+            --accent: #4da6ff;
+            --accent2: #ff704d;
+            --slider-track: #2a2a44;
+            --border: rgba(255, 255, 255, 0.12);
+            --shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: var(--bg);
+            font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        #canvas-container {
+            position: fixed;
+            inset: 0;
+            z-index: 1;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        /* 顶部标题栏 */
+        #title-bar {
+            position: fixed;
+            top: 16px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            background: var(--panel-bg);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 10px 24px;
+            pointer-events: auto;
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            box-shadow: var(--shadow);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        #title-bar h1 {
+            font-size: 1.15rem;
+            font-weight: 600;
+            color: #ffffff;
+            letter-spacing: 0.02em;
+            white-space: nowrap;
+        }
+        #title-bar .dot {
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: #4f8;
+            box-shadow: 0 0 10px #4f8;
+            animation: pulse-dot 2s ease-in-out infinite;
+        }
+        @keyframes pulse-dot {
+            0%,
+            100% {
+                box-shadow: 0 0 6px #4f8;
+            }
+            50% {
+                box-shadow: 0 0 18px #4f8, 0 0 30px rgba(68, 255, 136, 0.5);
+            }
+        }
+
+        /* 底部状态栏 */
+        #status-bar {
+            position: fixed;
+            bottom: 16px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            background: var(--panel-bg);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 8px 18px;
+            pointer-events: auto;
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            box-shadow: var(--shadow);
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            font-size: 0.82rem;
+            color: #b0b0c8;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        #status-bar span {
+            white-space: nowrap;
+        }
+        #status-bar .val {
+            color: #fff;
+            font-weight: 600;
+            font-variant-numeric: tabular-nums;
+            font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+        }
+        #status-indicator {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 0.78rem;
+            letter-spacing: 0.03em;
+        }
+        .status-confined {
+            background: rgba(68, 255, 136, 0.18);
+            color: #4f8;
+        }
+        .status-escaped {
+            background: rgba(255, 100, 80, 0.2);
+            color: #ff6450;
+        }
+        .status-active {
+            background: rgba(100, 180, 255, 0.18);
+            color: #8cf;
+        }
+
+        /* 控制面板 */
+        #control-panel {
+            position: fixed;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 10;
+            background: var(--panel-bg);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            padding: 20px 18px 16px;
+            pointer-events: auto;
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            box-shadow: var(--shadow);
+            width: 250px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+        #control-panel h3 {
+            font-size: 0.95rem;
+            color: #ccc;
+            letter-spacing: 0.04em;
+            text-align: center;
+            margin-bottom: 2px;
+            font-weight: 500;
+        }
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .control-group label {
+            font-size: 0.75rem;
+            color: #999;
+            letter-spacing: 0.03em;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .control-group label .lbl-val {
+            color: #fff;
+            font-weight: 600;
+            font-size: 0.78rem;
+            font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+        }
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: var(--slider-track);
+            outline: none;
+            cursor: pointer;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: #fff;
+            border: 2px solid var(--accent);
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(77, 166, 255, 0.4);
+            transition: box-shadow 0.2s;
+        }
+        input[type="range"]::-webkit-slider-thumb:active {
+            box-shadow: 0 0 20px rgba(77, 166, 255, 0.7);
+        }
+        #vperp-slider::-webkit-slider-thumb {
+            border-color: #ff704d;
+            box-shadow: 0 0 10px rgba(255, 112, 77, 0.4);
+        }
+        #vperp-slider::-webkit-slider-thumb:active {
+            box-shadow: 0 0 20px rgba(255, 112, 77, 0.7);
+        }
+        button {
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            border-radius: 10px;
+            padding: 10px 16px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.85rem;
+            letter-spacing: 0.04em;
+            transition: all 0.25s;
+            font-family: inherit;
+        }
+        button:hover {
+            background: #5db8ff;
+            box-shadow: 0 4px 16px rgba(77, 166, 255, 0.4);
+        }
+        button:active {
+            transform: scale(0.96);
+            transition: transform 0.08s;
+        }
+        button.secondary {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: #bbb;
+        }
+        button.secondary:hover {
+            background: rgba(255, 255, 255, 0.06);
+            box-shadow: none;
+            color: #fff;
+        }
+        #add-particle-btn {
+            background: #ff704d;
+            font-size: 0.8rem;
+            padding: 8px 12px;
+        }
+        #add-particle-btn:hover {
+            background: #ff8a6d;
+            box-shadow: 0 4px 16px rgba(255, 112, 77, 0.4);
+        }
+        #clear-escaped-btn {
+            font-size: 0.75rem;
+            padding: 6px 10px;
+        }
+
+        /* 图例提示 */
+        #legend-hint {
+            position: fixed;
+            left: 16px;
+            bottom: 100px;
+            z-index: 10;
+            color: #666;
+            font-size: 0.7rem;
+            pointer-events: none;
+            letter-spacing: 0.03em;
+            line-height: 1.5;
+        }
+
+        /* 响应式 */
+        @media (max-width: 700px) {
+            #control-panel {
+                right: 4px;
+                width: 210px;
+                padding: 14px 10px 12px;
+                gap: 10px;
+                border-radius: 14px;
+            }
+            #control-panel h3 {
+                font-size: 0.82rem;
+            }
+            #title-bar {
+                padding: 8px 16px;
+                border-radius: 16px;
+            }
+            #title-bar h1 {
+                font-size: 1rem;
+            }
+            #status-bar {
+                font-size: 0.7rem;
+                gap: 8px;
+                padding: 6px 12px;
+                border-radius: 14px;
+            }
+            #legend-hint {
+                display: none;
+            }
+        }
+        @media (max-width: 480px) {
+            #control-panel {
+                right: 2px;
+                width: 175px;
+                padding: 10px 8px 10px;
+                gap: 7px;
+                border-radius: 12px;
+            }
+            #control-panel h3 {
+                font-size: 0.72rem;
+            }
+            input[type="range"] {
+                height: 4px;
+            }
+            input[type="range"]::-webkit-slider-thumb {
+                width: 18px;
+                height: 18px;
+            }
+            button {
+                padding: 7px 10px;
+                font-size: 0.72rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="canvas-container"></div>
+
+    <!-- 顶部标题 -->
+    <div id="title-bar">
+        <div class="dot"></div>
+        <h1>磁镜装置 · 粒子运动模拟</h1>
+    </div>
+
+    <!-- 底部状态栏 -->
+    <div id="status-bar">
+        <span>状态：<span id="status-indicator" class="status-active">运行中</span></span>
+        <span>|v|<sub>总</sub>：<span class="val" id="v-total">--</span></span>
+        <span>v<sub>∥</sub>：<span class="val" id="v-par">--</span></span>
+        <span>v<sub>⊥</sub>：<span class="val" id="v-perp-real">--</span></span>
+        <span>磁镜比：<span class="val">≈3.0</span></span>
+    </div>
+
+    <!-- 控制面板 -->
+    <div id="control-panel">
+        <h3>⚙️ 粒子初速度</h3>
+        <div class="control-group">
+            <label>垂直分量 v<sub>⊥</sub> <span class="lbl-val" id="lbl-vperp">1.20</span></label>
+            <input type="range" id="vperp-slider" min="0.10" max="2.50" step="0.01" value="1.20">
+        </div>
+        <div class="control-group">
+            <label>平行分量 v<sub>∥</sub> <span class="lbl-val" id="lbl-vpar">0.60</span></label>
+            <input type="range" id="vpar-slider" min="0.00" max="2.50" step="0.01" value="0.60">
+        </div>
+        <button id="reset-btn">🔄 重置粒子</button>
+        <button id="add-particle-btn" class="secondary">➕ 添加测试粒子</button>
+        <button id="clear-escaped-btn" class="secondary" style="font-size:0.72rem;">🗑️ 清除逃逸轨迹</button>
+        <div style="font-size:0.68rem;color:#666;text-align:center;margin-top:2px;">
+            临界角 ≈ 35° · sin²θ > 1/3 可约束
+        </div>
+    </div>
+
+    <!-- 图例 -->
+    <div id="legend-hint">
+        🟡 主粒子轨迹<br>
+        🔵 测试粒子轨迹<br>
+        🟠 铜线圈（强磁场区）<br>
+        🖱️ 拖拽旋转 · 滚轮缩放
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        // ==================== DOM 元素 ====================
+        const container = document.getElementById('canvas-container');
+        const vperpSlider = document.getElementById('vperp-slider');
+        const vparSlider = document.getElementById('vpar-slider');
+        const lblVperp = document.getElementById('lbl-vperp');
+        const lblVpar = document.getElementById('lbl-vpar');
+        const resetBtn = document.getElementById('reset-btn');
+        const addParticleBtn = document.getElementById('add-particle-btn');
+        const clearEscapedBtn = document.getElementById('clear-escaped-btn');
+        const statusIndicator = document.getElementById('status-indicator');
+        const vTotalDisplay = document.getElementById('v-total');
+        const vParDisplay = document.getElementById('v-par');
+        const vPerpRealDisplay = document.getElementById('v-perp-real');
+
+        // ==================== 场景初始化 ====================
+        const scene = new THREE.Scene();
+
+        // 背景渐变 - 使用场景雾
+        scene.background = new THREE.Color(0x0a0a18);
+        scene.fog = new THREE.Fog(0x0a0a18, 15, 45);
+
+        const camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 0.3, 60);
+        camera.position.set(7, 3.5, 9);
+        camera.lookAt(0, 0, 0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.2;
+        container.appendChild(renderer.domElement);
+
+        // OrbitControls
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.target.set(0, 0, 0);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.08;
+        controls.minDistance = 3;
+        controls.maxDistance = 20;
+        controls.maxPolarAngle = Math.PI * 0.78;
+        controls.update();
+
+        // ==================== 光照 ====================
+        const ambientLight = new THREE.AmbientLight(0x334466, 1.8);
+        scene.add(ambientLight);
+
+        const sunLight = new THREE.DirectionalLight(0xffeedd, 4.5);
+        sunLight.position.set(10, 14, 6);
+        sunLight.castShadow = true;
+        sunLight.shadow.mapSize.width = 2048;
+        sunLight.shadow.mapSize.height = 2048;
+        sunLight.shadow.camera.near = 0.5;
+        sunLight.shadow.camera.far = 60;
+        sunLight.shadow.camera.left = -15;
+        sunLight.shadow.camera.right = 15;
+        sunLight.shadow.camera.top = 15;
+        sunLight.shadow.camera.bottom = -15;
+        sunLight.shadow.bias = -0.0003;
+        sunLight.shadow.normalBias = 0.02;
+        scene.add(sunLight);
+
+        const fillLight = new THREE.DirectionalLight(0x8899cc, 1.5);
+        fillLight.position.set(-4, 2, -3);
+        scene.add(fillLight);
+
+        const rimLight = new THREE.DirectionalLight(0xffffff, 1.0);
+        rimLight.position.set(0, -1, 8);
+        scene.add(rimLight);
+
+        // ==================== 地面参考平面 ====================
+        const gridHelper = new THREE.PolarGridHelper(8, 32, 24, 128, 0x222244, 0x1a1a33);
+        gridHelper.position.y = -5;
+        scene.add(gridHelper);
+
+        // 半透明参考盘（xz平面，y=0即z轴向上时在水平面）
+        const refPlaneGeo = new THREE.PlaneGeometry(12, 12);
+        const refPlaneMat = new THREE.MeshStandardMaterial({
+            color: 0x334466,
+            transparent: true,
+            opacity: 0.08,
+            roughness: 1,
+            metalness: 0,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+        });
+        const refPlane = new THREE.Mesh(refPlaneGeo, refPlaneMat);
+        refPlane.rotation.x = -Math.PI / 2;
+        refPlane.position.y = -4.5;
+        refPlane.receiveShadow = true;
+        scene.add(refPlane);
+
+        // ==================== 物理参数 ====================
+        const COIL_RADIUS = 2.0; // 线圈半径
+        const COIL_POSITION = 3.0; // 线圈z位置（±3）
+        const B_COIL_CENTER = 5.0; // 单个线圈在其中心处的磁场强度
+
+        // 轴上磁场 B_z_axis(z)
+        function BzAxis(z) {
+            const R2 = COIL_RADIUS * COIL_RADIUS;
+            const d = COIL_POSITION;
+            const term1 = R2 / Math.pow(R2 + (z - d) * (z - d), 1.5);
+            const term2 = R2 / Math.pow(R2 + (z + d) * (z + d), 1.5);
+            return B_COIL_CENTER * COIL_RADIUS * (term1 + term2);
+        }
+
+        // dB_z_axis/dz
+        function dBzAxisDz(z) {
+            const R2 = COIL_RADIUS * COIL_RADIUS;
+            const d = COIL_POSITION;
+            const R3 = COIL_RADIUS * COIL_RADIUS * COIL_RADIUS;
+            const t1 = -(z - d) / Math.pow(R2 + (z - d) * (z - d), 2.5);
+            const t2 = -(z + d) / Math.pow(R2 + (z + d) * (z + d), 2.5);
+            return -3 * B_COIL_CENTER * R3 * (t1 + t2);
+        }
+
+        // d²B_z_axis/dz²
+        function d2BzAxisDz2(z) {
+            const R2 = COIL_RADIUS * COIL_RADIUS;
+            const d = COIL_POSITION;
+            const R3 = COIL_RADIUS * COIL_RADIUS * COIL_RADIUS;
+            const t1 = (R2 - 4 * (z - d) * (z - d)) / Math.pow(R2 + (z - d) * (z - d), 3.5);
+            const t2 = (R2 - 4 * (z + d) * (z + d)) / Math.pow(R2 + (z + d) * (z + d), 3.5);
+            return -3 * B_COIL_CENTER * R3 * (t1 + t2);
+        }
+
+        // 完整3D磁场 B(x,y,z) - 轴对称近似
+        function magneticField(x, y, z) {
+            const r = Math.sqrt(x * x + y * y);
+            const Bz_axis = BzAxis(z);
+            const dBz_dz = dBzAxisDz(z);
+            const d2Bz_dz2 = d2BzAxisDz2(z);
+
+            let Bx, By, Bz_val;
+            if (r < 1e-8) {
+                Bx = 0;
+                By = 0;
+                Bz_val = Bz_axis;
+            } else {
+                const Br = -(r / 2) * dBz_dz;
+                Bx = Br * (x / r);
+                By = Br * (y / r);
+                Bz_val = Bz_axis - (r * r / 4) * d2Bz_dz2;
+            }
+            return new THREE.Vector3(Bx, By, Bz_val);
+        }
+
+        // 磁场在线圈中心处的值（用于参考）
+        const B_AT_COIL = BzAxis(COIL_POSITION);
+        const B_AT_CENTER = BzAxis(0);
+        const MIRROR_RATIO = B_AT_COIL / B_AT_CENTER;
+        console.log(`磁镜比: ${MIRROR_RATIO.toFixed(2)}, 中心B: ${B_AT_CENTER.toFixed(3)}, 线圈B: ${B_AT_COIL.toFixed(3)}`);
+
+        // ==================== 场景物体 ====================
+        // 线圈组
+        const coilGroup = new THREE.Group();
+        scene.add(coilGroup);
+
+        function createCoil(zPos) {
+            const group = new THREE.Group();
+
+            // 主环 - Torus
+            const torusGeo = new THREE.TorusGeometry(COIL_RADIUS, 0.16, 32, 100);
+            const torusMat = new THREE.MeshStandardMaterial({
+                color: 0xe88840,
+                roughness: 0.25,
+                metalness: 0.9,
+            });
+            const torus = new THREE.Mesh(torusGeo, torusMat);
+            torus.castShadow = true;
+            torus.receiveShadow = true;
+            group.add(torus);
+
+            // 内发光环
+            const innerGeo = new THREE.TorusGeometry(COIL_RADIUS, 0.04, 16, 100);
+            const innerMat = new THREE.MeshStandardMaterial({
+                color: 0xffaa44,
+                roughness: 0.2,
+                metalness: 0.3,
+                emissive: 0xff6600,
+                emissiveIntensity: 0.7,
+            });
+            const innerRing = new THREE.Mesh(innerGeo, innerMat);
+            group.add(innerRing);
+
+            // 支撑结构
+            const spokeCount = 6;
+            for (let i = 0; i < spokeCount; i++) {
+                const angle = (i / spokeCount) * Math.PI * 2;
+                const sx = COIL_RADIUS * Math.cos(angle);
+                const sy = COIL_RADIUS * Math.sin(angle);
+                const spokeGeo = new THREE.CylinderGeometry(0.05, 0.05, 0.6, 8);
+                const spokeMat = new THREE.MeshStandardMaterial({
+                    color: 0x666688,
+                    roughness: 0.5,
+                    metalness: 0.7,
+                });
+                const spoke = new THREE.Mesh(spokeGeo, spokeMat);
+                spoke.position.set(sx, sy, 0);
+                spoke.rotation.z = Math.PI / 2;
+                spoke.rotation.y = angle;
+                spoke.castShadow = true;
+                group.add(spoke);
+            }
+
+            group.position.set(0, 0, zPos);
+            return group;
+        }
+
+        const coil1 = createCoil(COIL_POSITION);
+        const coil2 = createCoil(-COIL_POSITION);
+        coilGroup.add(coil1);
+        coilGroup.add(coil2);
+
+        // 强磁场区域指示环
+        function createFieldIndicator(zPos, colorHex) {
+            const geo = new THREE.TorusGeometry(COIL_RADIUS + 0.35, 0.03, 8, 60);
+            const mat = new THREE.MeshBasicMaterial({
+                color: colorHex,
+                transparent: true,
+                opacity: 0.5,
+                depthWrite: false,
+            });
+            const ring = new THREE.Mesh(geo, mat);
+            ring.position.z = zPos;
+            return ring;
+        }
+        const indicator1 = createFieldIndicator(COIL_POSITION, 0xff8844);
+        const indicator2 = createFieldIndicator(-COIL_POSITION, 0xff8844);
+        coilGroup.add(indicator1);
+        coilGroup.add(indicator2);
+
+        // ==================== 磁场线 ====================
+        const fieldLineGroup = new THREE.Group();
+        scene.add(fieldLineGroup);
+
+        function traceFieldLine(rStart, zStart, maxSteps, stepSize, forward) {
+            const points = [];
+            let r = rStart;
+            let z = zStart;
+            const sign = forward ? 1 : -1;
+
+            for (let i = 0; i < maxSteps; i++) {
+                const x = r;
+                const y = 0;
+                const B = magneticField(x, y, z);
+                const Br = Math.sqrt(B.x * B.x + B.y * B.y) * (r > 1e-8 ? 1 : 0);
+                const Bz = B.z;
+                const Bmag = Math.sqrt(Br * Br + Bz * Bz);
+
+                if (Bmag < 1e-9 || Math.abs(z) > 6 || r > 5) break;
+
+                points.push(new THREE.Vector3(r, 0, z));
+
+                const dr = sign * (Br / Bmag) * stepSize;
+                const dz = sign * (Bz / Bmag) * stepSize;
+                r += dr;
+                z += dz;
+
+                if (r < 0) r = 0;
+            }
+            return points;
+        }
+
+        function createFieldLines3D() {
+            // 在xz平面追踪磁场线，然后绕z轴旋转复制
+            const seedRadii = [0.15, 0.4, 0.7, 1.1, 1.5, 1.9];
+            const numAngles = 8; // 绕z轴复制8份
+
+            for (const r0 of seedRadii) {
+                // 从z=0出发，向正z方向追踪
+                const pointsForward = traceFieldLine(r0, 0, 600, 0.04, true);
+                // 从z=0出发，向负z方向追踪
+                const pointsBackward = traceFieldLine(r0, 0, 600, 0.04, false);
+                // 合并（反向+正向）
+                const allPoints = [...pointsBackward.reverse(), ...pointsForward];
+
+                if (allPoints.length < 4) continue;
+
+                // 绕z轴旋转复制
+                for (let ai = 0; ai < numAngles; ai++) {
+                    const angle = (ai / numAngles) * Math.PI * 2;
+                    const rotatedPoints = allPoints.map(p => {
+                        const cosA = Math.cos(angle);
+                        const sinA = Math.sin(angle);
+                        return new THREE.Vector3(
+                            p.x * cosA,
+                            p.x * sinA,
+                            p.z
+                        );
+                    });
+
+                    const curve = new THREE.CatmullRomCurve3(rotatedPoints, false, 'catmullrom', 0.5);
+                    const curvePoints = curve.getPoints(Math.min(rotatedPoints.length, 300));
+                    const geo = new THREE.BufferGeometry().setFromPoints(curvePoints);
+                    const mat = new THREE.LineBasicMaterial({
+                        color: 0x3366aa,
+                        transparent: true,
+                        opacity: 0.35,
+                        depthWrite: false,
+                    });
+                    const line = new THREE.Line(geo, mat);
+                    fieldLineGroup.add(line);
+                }
+            }
+        }
+        createFieldLines3D();
+
+        // ==================== 粒子系统 ====================
+        const MAX_TRAIL_POINTS = 12000;
+        const SIM_BOUNDARY_Z = 8.5;
+        const SIM_BOUNDARY_R = 5.5;
+
+        // 存储所有活跃粒子
+        const particles = [];
+
+        class Particle {
+            constructor(initialPos, initialVel, trailColor, glowColor, particleRadius = 0.1) {
+                this.pos = initialPos.clone();
+                this.vel = initialVel.clone();
+                this.trailColor = trailColor;
+                this.glowColor = glowColor;
+                this.particleRadius = particleRadius;
+                this.alive = true;
+                this.escaped = false;
+                this.trailPoints = [this.pos.clone()];
+                this.simTime = 0;
+
+                // 3D对象
+                // 发光球体
+                const sphereGeo = new THREE.SphereGeometry(particleRadius, 20, 20);
+                const sphereMat = new THREE.MeshStandardMaterial({
+                    color: glowColor,
+                    roughness: 0.2,
+                    metalness: 0.1,
+                    emissive: glowColor,
+                    emissiveIntensity: 1.5,
+                });
+                this.sphere = new THREE.Mesh(sphereGeo, sphereMat);
+                this.sphere.castShadow = true;
+                this.sphere.position.copy(this.pos);
+                scene.add(this.sphere);
+
+                // 光晕（点光源或sprite）
+                const spriteTex = createGlowTexture(glowColor);
+                const spriteMat = new THREE.SpriteMaterial({
+                    map: spriteTex,
+                    blending: THREE.AdditiveBlending,
+                    transparent: true,
+                    opacity: 0.7,
+                    depthWrite: false,
+                });
+                this.sprite = new THREE.Sprite(spriteMat);
+                this.sprite.scale.set(0.55, 0.55, 1);
+                this.sprite.position.copy(this.pos);
+                scene.add(this.sprite);
+
+                // 轨迹线
+                this.trailLine = null;
+                this.createTrailLine();
+            }
+
+            createTrailLine() {
+                if (this.trailLine) {
+                    scene.remove(this.trailLine);
+                    if (this.trailLine.geometry) this.trailLine.geometry.dispose();
+                    if (this.trailLine.material) this.trailLine.material.dispose();
+                }
+                const geo = new THREE.BufferGeometry();
+                const positionsArr = new Float32Array(MAX_TRAIL_POINTS * 3);
+                geo.setAttribute('position', new THREE.BufferAttribute(positionsArr, 3));
+                geo.setDrawRange(0, 0);
+                const mat = new THREE.LineBasicMaterial({
+                    color: this.trailColor,
+                    linewidth: 1,
+                    transparent: true,
+                    opacity: 0.85,
+                    depthWrite: true,
+                });
+                this.trailLine = new THREE.Line(geo, mat);
+                this.trailPointCount = 0;
+                this.trailBufferIndex = 0;
+                scene.add(this.trailLine);
+            }
+
+            addTrailPoint() {
+                const p = this.pos;
+                const idx = this.trailBufferIndex;
+                const arr = this.trailLine.geometry.attributes.position.array;
+                const base = idx * 3;
+                arr[base] = p.x;
+                arr[base + 1] = p.y;
+                arr[base + 2] = p.z;
+                this.trailBufferIndex = (idx + 1) % MAX_TRAIL_POINTS;
+                if (this.trailPointCount < MAX_TRAIL_POINTS) {
+                    this.trailPointCount++;
+                }
+                this.trailLine.geometry.attributes.position.needsUpdate = true;
+                this.trailLine.geometry.setDrawRange(0, this.trailPointCount);
+
+                // 处理环形缓冲区的情况 - 需要正确设置drawRange
+                if (this.trailPointCount >= MAX_TRAIL_POINTS) {
+                    // 缓冲区已满，从头循环
+                    // 我们需要调整drawRange来正确显示
+                    // 简单处理：设置drawRange覆盖整个缓冲区
+                    this.trailLine.geometry.setDrawRange(0, MAX_TRAIL_POINTS);
+                }
+            }
+
+            updateTrailGeometry() {
+                // 当缓冲区循环时，需要重新组织顶点
+                if (this.trailPointCount >= MAX_TRAIL_POINTS && this.trailBufferIndex === 0) {
+                    // 刚好循环完，顶点顺序是正确的
+                    this.trailLine.geometry.setDrawRange(0, MAX_TRAIL_POINTS);
+                } else if (this.trailPointCount >= MAX_TRAIL_POINTS) {
+                    // 需要重新排列：从bufferIndex到结尾，然后从0到bufferIndex-1
+                    const arr = this.trailLine.geometry.attributes.position.array;
+                    const rearranged = new Float32Array(MAX_TRAIL_POINTS * 3);
+                    const bi = this.trailBufferIndex;
+                    // 从bi到MAX_TRAIL_POINTS-1
+                    const seg1Len = MAX_TRAIL_POINTS - bi;
+                    rearranged.set(arr.subarray(bi * 3, MAX_TRAIL_POINTS * 3), 0);
+                    // 从0到bi-1
+                    rearranged.set(arr.subarray(0, bi * 3), seg1Len * 3);
+                    this.trailLine.geometry.attributes.position.array.set(rearranged);
+                    this.trailLine.geometry.attributes.position.needsUpdate = true;
+                    this.trailBufferIndex = 0;
+                    this.trailLine.geometry.setDrawRange(0, MAX_TRAIL_POINTS);
+                }
+            }
+
+            remove() {
+                if (this.sphere) {
+                    scene.remove(this.sphere);
+                    if (this.sphere.geometry) this.sphere.geometry.dispose();
+                    if (this.sphere.material) this.sphere.material.dispose();
+                }
+                if (this.sprite) {
+                    scene.remove(this.sprite);
+                    if (this.sprite.material) {
+                        if (this.sprite.material.map) this.sprite.material.map.dispose();
+                        this.sprite.material.dispose();
+                    }
+                }
+                if (this.trailLine) {
+                    scene.remove(this.trailLine);
+                    if (this.trailLine.geometry) this.trailLine.geometry.dispose();
+                    if (this.trailLine.material) this.trailLine.material.dispose();
+                }
+            }
+
+            updateVisuals() {
+                this.sphere.position.copy(this.pos);
+                this.sprite.position.copy(this.pos);
+            }
+        }
+
+        // 创建发光纹理
+        function createGlowTexture(colorHex) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 64;
+            canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+            const c = new THREE.Color(colorHex);
+            gradient.addColorStop(0, `rgba(${Math.floor(c.r*255)},${Math.floor(c.g*255)},${Math.floor(c.b*255)},1)`);
+            gradient.addColorStop(0.25,
+                `rgba(${Math.floor(c.r*255)},${Math.floor(c.g*255)},${Math.floor(c.b*255)},0.7)`);
+            gradient.addColorStop(0.6, `rgba(${Math.floor(c.r*255)},${Math.floor(c.g*255)},${Math.floor(c.b*255)},0.15)`);
+            gradient.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, 64, 64);
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.needsUpdate = true;
+            return tex;
+        }
+
+        // ==================== 主粒子 ====================
+        let mainParticle = null;
+
+        function createMainParticle(vPerp, vPar) {
+            if (mainParticle) {
+                mainParticle.remove();
+            }
+            const pos = new THREE.Vector3(0.35, 0.0, 0.05);
+            // v_perp在xy平面（垂直于z），v_par沿z轴
+            const angle = Math.random() * Math.PI * 2;
+            const vel = new THREE.Vector3(
+                vPerp * Math.cos(angle),
+                vPerp * Math.sin(angle),
+                vPar
+            );
+            mainParticle = new Particle(pos, vel, 0xffdd44, 0xffcc00, 0.12);
+            particles.push(mainParticle);
+            return mainParticle;
+        }
+
+        // 初始值
+        let currentVPerp = parseFloat(vperpSlider.value);
+        let currentVPar = parseFloat(vparSlider.value);
+        createMainParticle(currentVPerp, currentVPar);
+
+        // ==================== 测试粒子列表 ====================
+        const testParticles = [];
+
+        function addTestParticle(vPerp, vPar) {
+            const pos = new THREE.Vector3(
+                (Math.random() - 0.5) * 0.6,
+                (Math.random() - 0.5) * 0.6,
+                (Math.random() - 0.5) * 0.3
+            );
+            const angle = Math.random() * Math.PI * 2;
+            const vel = new THREE.Vector3(
+                vPerp * Math.cos(angle),
+                vPerp * Math.sin(angle),
+                vPar
+            );
+            const p = new Particle(pos, vel, 0x55aaff, 0x4488ee, 0.07);
+            testParticles.push(p);
+            particles.push(p);
+            return p;
+        }
+
+        function clearEscapedTestParticles() {
+            for (let i = testParticles.length - 1; i >= 0; i--) {
+                const tp = testParticles[i];
+                if (tp.escaped || !tp.alive) {
+                    tp.remove();
+                    const idx = particles.indexOf(tp);
+                    if (idx >= 0) particles.splice(idx, 1);
+                    testParticles.splice(i, 1);
+                }
+            }
+            // 也清理particles数组中已escaped的test particles
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                if (p !== mainParticle && (p.escaped || !p.alive) && !testParticles.includes(p)) {
+                    p.remove();
+                    particles.splice(i, 1);
+                }
+            }
+        }
+
+        // ==================== 物理积分 (RK4) ====================
+        const CHARGE_OVER_MASS = 1.0; // q/m
+
+        function computeAcceleration(pos, vel) {
+            const B = magneticField(pos.x, pos.y, pos.z);
+            // a = (q/m) * (v × B)
+            const cross = new THREE.Vector3().crossVectors(vel, B);
+            return cross.multiplyScalar(CHARGE_OVER_MASS);
+        }
+
+        function rk4Step(p, dt) {
+            // k1
+            const a1 = computeAcceleration(p.pos, p.vel);
+            const k1v = a1.clone().multiplyScalar(dt);
+            const k1p = p.vel.clone().multiplyScalar(dt);
+
+            // k2
+            const pos2 = p.pos.clone().addScaledVector(k1p, 0.5);
+            const vel2 = p.vel.clone().addScaledVector(k1v, 0.5);
+            const a2 = computeAcceleration(pos2, vel2);
+            const k2v = a2.clone().multiplyScalar(dt);
+            const k2p = vel2.clone().multiplyScalar(dt);
+
+            // k3
+            const pos3 = p.pos.clone().addScaledVector(k2p, 0.5);
+            const vel3 = p.vel.clone().addScaledVector(k2v, 0.5);
+            const a3 = computeAcceleration(pos3, vel3);
+            const k3v = a3.clone().multiplyScalar(dt);
+            const k3p = vel3.clone().multiplyScalar(dt);
+
+            // k4
+            const pos4 = p.pos.clone().add(k3p);
+            const vel4 = p.vel.clone().add(k3v);
+            const a4 = computeAcceleration(pos4, vel4);
+            const k4v = a4.clone().multiplyScalar(dt);
+            const k4p = vel4.clone().multiplyScalar(dt);
+
+            // 更新
+            p.pos.addScaledVector(k1p, 1 / 6);
+            p.pos.addScaledVector(k2p, 2 / 6);
+            p.pos.addScaledVector(k3p, 2 / 6);
+            p.pos.addScaledVector(k4p, 1 / 6);
+
+            p.vel.addScaledVector(k1v, 1 / 6);
+            p.vel.addScaledVector(k2v, 2 / 6);
+            p.vel.addScaledVector(k3v, 2 / 6);
+            p.vel.addScaledVector(k4v, 1 / 6);
+
+            p.simTime += dt;
+        }
+
+        function checkBoundary(p) {
+            const r = Math.sqrt(p.pos.x * p.pos.x + p.pos.y * p.pos.y);
+            if (Math.abs(p.pos.z) > SIM_BOUNDARY_Z || r > SIM_BOUNDARY_R) {
+                p.escaped = true;
+                p.alive = false;
+            }
+        }
+
+        // ==================== 动画循环 ====================
+        const SUBSTEPS_PER_FRAME = 25;
+        const DT_PER_SUBSTEP = 0.004;
+        let frameCount = 0;
+        let trailAddCounter = 0;
+        const TRAIL_ADD_INTERVAL = 3; // 每3个子步骤添加一个轨迹点
+
+        function animate(timestamp) {
+            requestAnimationFrame(animate);
+
+            // 物理更新
+            for (const p of particles) {
+                if (!p.alive) continue;
+                for (let i = 0; i < SUBSTEPS_PER_FRAME; i++) {
+                    rk4Step(p, DT_PER_SUBSTEP);
+                    trailAddCounter++;
+                    if (trailAddCounter >= TRAIL_ADD_INTERVAL) {
+                        trailAddCounter = 0;
+                        p.addTrailPoint();
+                    }
+                    checkBoundary(p);
+                    if (!p.alive) break;
+                }
+                p.updateVisuals();
+            }
+
+            // 每300帧整理一次轨迹缓冲区
+            if (frameCount % 300 === 0) {
+                for (const p of particles) {
+                    if (p.alive && p.trailPointCount >= MAX_TRAIL_POINTS) {
+                        p.updateTrailGeometry();
+                    }
+                }
+            }
+
+            // 更新UI状态
+            if (mainParticle && frameCount % 6 === 0) {
+                const vTotal = mainParticle.vel.length();
+                const B = magneticField(mainParticle.pos.x, mainParticle.pos.y, mainParticle.pos.z);
+                const Bmag = B.length();
+                let vPar = 0;
+                let vPerp = 0;
+                if (Bmag > 1e-9) {
+                    const bUnit = B.clone().normalize();
+                    vPar = Math.abs(mainParticle.vel.dot(bUnit));
+                    const vPerpVec = mainParticle.vel.clone().addScaledVector(bUnit, -mainParticle.vel.dot(bUnit));
+                    vPerp = vPerpVec.length();
+                }
+                vTotalDisplay.textContent = vTotal.toFixed(2);
+                vParDisplay.textContent = vPar.toFixed(2);
+                vPerpRealDisplay.textContent = vPerp.toFixed(2);
+
+                if (mainParticle.escaped) {
+                    statusIndicator.textContent = '已逃逸';
+                    statusIndicator.className = 'status-escaped';
+                } else if (!mainParticle.alive) {
+                    statusIndicator.textContent = '已停止';
+                    statusIndicator.className = 'status-escaped';
+                } else {
+                    // 判断是否被约束（在中心区域来回运动）
+                    const zAbs = Math.abs(mainParticle.pos.z);
+                    if (zAbs < COIL_POSITION + 1.5) {
+                        statusIndicator.textContent = '约束中';
+                        statusIndicator.className = 'status-confined';
+                    } else {
+                        statusIndicator.textContent = '靠近边界';
+                        statusIndicator.className = 'status-active';
+                    }
+                }
+            }
+
+            // 线圈微妙的呼吸效果
+            const breathe = 1 + Math.sin(timestamp * 0.001) * 0.015;
+            indicator1.scale.setScalar(breathe);
+            indicator2.scale.setScalar(breathe);
+            indicator1.material.opacity = 0.4 + Math.sin(timestamp * 0.0015) * 0.15;
+            indicator2.material.opacity = 0.4 + Math.sin(timestamp * 0.0015) * 0.15;
+
+            controls.update();
+            renderer.render(scene, camera);
+            frameCount++;
+        }
+
+        // ==================== 事件处理 ====================
+        vperpSlider.addEventListener('input', () => {
+            currentVPerp = parseFloat(vperpSlider.value);
+            lblVperp.textContent = currentVPerp.toFixed(2);
+        });
+
+        vparSlider.addEventListener('input', () => {
+            currentVPar = parseFloat(vparSlider.value);
+            lblVpar.textContent = currentVPar.toFixed(2);
+        });
+
+        resetBtn.addEventListener('click', () => {
+            currentVPerp = parseFloat(vperpSlider.value);
+            currentVPar = parseFloat(vparSlider.value);
+            lblVperp.textContent = currentVPerp.toFixed(2);
+            lblVpar.textContent = currentVPar.toFixed(2);
+            // 移除旧主粒子
+            if (mainParticle) {
+                const idx = particles.indexOf(mainParticle);
+                if (idx >= 0) particles.splice(idx, 1);
+                mainParticle.remove();
+            }
+            // 创建新主粒子
+            mainParticle = createMainParticle(currentVPerp, currentVPar);
+            statusIndicator.textContent = '运行中';
+            statusIndicator.className = 'status-active';
+            vTotalDisplay.textContent = '--';
+            vParDisplay.textContent = '--';
+            vPerpRealDisplay.textContent = '--';
+        });
+
+        addParticleBtn.addEventListener('click', () => {
+            const vp = parseFloat(vperpSlider.value) * (0.7 + Math.random() * 0.6);
+            const vpar = parseFloat(vparSlider.value) * (0.5 + Math.random() * 1.0);
+            addTestParticle(vp, vpar);
+        });
+
+        clearEscapedBtn.addEventListener('click', () => {
+            clearEscapedTestParticles();
+        });
+
+        // 响应式处理
+        window.addEventListener('resize', () => {
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        });
+
+        // 键盘快捷键
+        window.addEventListener('keydown', (e) => {
+            switch (e.key.toLowerCase()) {
+                case 'r':
+                    resetBtn.click();
+                    break;
+                case 't':
+                    addParticleBtn.click();
+                    break;
+                case 'c':
+                    clearEscapedBtn.click();
+                    break;
+                case 'f':
+                    // 重置视角
+                    camera.position.set(7, 3.5, 9);
+                    controls.target.set(0, 0, 0);
+                    controls.update();
+                    break;
+                case '1':
+                    // 预设：良好约束
+                    vperpSlider.value = 1.5;
+                    vparSlider.value = 0.4;
+                    vperpSlider.dispatchEvent(new Event('input'));
+                    vparSlider.dispatchEvent(new Event('input'));
+                    resetBtn.click();
+                    break;
+                case '2':
+                    // 预设：临界
+                    vperpSlider.value = 0.9;
+                    vparSlider.value = 1.1;
+                    vperpSlider.dispatchEvent(new Event('input'));
+                    vparSlider.dispatchEvent(new Event('input'));
+                    resetBtn.click();
+                    break;
+                case '3':
+                    // 预设：逃逸
+                    vperpSlider.value = 0.3;
+                    vparSlider.value = 2.0;
+                    vperpSlider.dispatchEvent(new Event('input'));
+                    vparSlider.dispatchEvent(new Event('input'));
+                    resetBtn.click();
+                    break;
+                default:
+                    break;
+            }
+        });
+
+        // ==================== 启动 ====================
+        // 初始化标签显示
+        lblVperp.textContent = currentVPerp.toFixed(2);
+        lblVpar.textContent = currentVPar.toFixed(2);
+
+        // 添加几个初始测试粒子展示不同行为
+        setTimeout(() => {
+            addTestParticle(1.6, 0.3); // 良好约束
+            addTestParticle(0.5, 1.8); // 可能逃逸
+            addTestParticle(1.0, 0.9); // 临界
+        }, 300);
+
+        // 开始动画循环
+        requestAnimationFrame(animate);
+
+        console.log('🚀 磁镜粒子模拟已就绪');
+        console.log('  磁镜比 ≈', MIRROR_RATIO.toFixed(2));
+        console.log('  临界角 ≈', (Math.asin(Math.sqrt(1 / MIRROR_RATIO)) * 180 / Math.PI).toFixed(1), '°');
+        console.log('  快捷键: R=重置 F=复位视角 T=添加粒子 C=清除逃逸');
+        console.log('  预设: 1=良好约束 2=临界 3=逃逸');
+        console.log('  拖拽旋转 | 滚轮缩放 | 右键平移');
+    </script>
+</body>
+</html>
