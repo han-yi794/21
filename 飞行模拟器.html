@@ -1,0 +1,1671 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>真实飞行模拟器 3D - 终极版</title>
+    <style>
+        * { 
+            margin: 0; 
+            padding: 0; 
+            box-sizing: border-box; 
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        body { 
+            overflow: hidden; 
+            background: #000; 
+            font-family: 'Segoe UI', sans-serif;
+            touch-action: none;
+            position: fixed;
+            width: 100%;
+            height: 100%;
+        }
+        
+        #gameCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            display: block;
+        }
+        
+        #ui {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none;
+        }
+        
+        .hud-panel {
+            position: absolute;
+            background: rgba(0, 15, 30, 0.7);
+            border: 1px solid rgba(100, 200, 255, 0.3);
+            border-radius: 8px;
+            padding: 8px;
+            color: #aaddff;
+            font-size: 11px;
+            backdrop-filter: blur(4px);
+            pointer-events: none;
+        }
+        
+        #altimeter { top: 8px; left: 8px; width: 140px; }
+        #speedometer { top: 8px; right: 8px; width: 140px; }
+        #compass { 
+            bottom: 70px; 
+            left: 50%; 
+            transform: translateX(-50%); 
+            width: 200px; 
+            text-align: center; 
+        }
+        
+        .hud-value {
+            font-size: 22px;
+            font-weight: bold;
+            color: #ffffff;
+            text-shadow: 0 0 10px rgba(100, 200, 255, 0.5);
+        }
+        
+        .hud-label {
+            font-size: 9px;
+            opacity: 0.7;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .bar-container {
+            width: 100%;
+            height: 12px;
+            background: rgba(0,0,0,0.5);
+            border-radius: 6px;
+            margin: 3px 0;
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .bar-fill {
+            height: 100%;
+            border-radius: 6px;
+            transition: width 0.15s;
+        }
+        
+        .altitude-bar { background: linear-gradient(90deg, #2266cc, #66ccff); }
+        .speed-bar { background: linear-gradient(90deg, #cc6622, #ffcc44); }
+        .throttle-bar { background: linear-gradient(90deg, #cc2222, #ffaa44); }
+        .gforce-bar { background: linear-gradient(90deg, #44cc44, #ff4444); }
+        
+        /* 手机控制层 - 必须在最上层 */
+        #mobile-controls {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 100;
+            pointer-events: none;
+        }
+        
+        .control-zone {
+            position: absolute;
+            pointer-events: auto;
+            touch-action: none;
+        }
+        
+        /* 虚拟摇杆 - 左侧 */
+        #stick-zone {
+            bottom: 100px;
+            left: 20px;
+            width: 140px;
+            height: 140px;
+            background: radial-gradient(circle, rgba(100,200,255,0.15) 0%, rgba(100,200,255,0.05) 70%, transparent 100%);
+            border: 2px solid rgba(100, 200, 255, 0.25);
+            border-radius: 50%;
+        }
+        
+        #stick-knob {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            background: radial-gradient(circle, rgba(100, 200, 255, 0.8) 0%, rgba(50, 150, 255, 0.6) 100%);
+            border: 2px solid rgba(200, 240, 255, 0.9);
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 15px rgba(100, 200, 255, 0.6);
+        }
+        
+        /* 油门滑块 - 右侧 */
+        #throttle-zone {
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 60px;
+            height: 220px;
+            background: rgba(255, 100, 50, 0.08);
+            border: 2px solid rgba(255, 100, 50, 0.25);
+            border-radius: 30px;
+        }
+        
+        #throttle-bg {
+            position: absolute;
+            top: 5px;
+            left: 5px;
+            right: 5px;
+            bottom: 5px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 25px;
+            overflow: hidden;
+        }
+        
+        #throttle-fill {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: linear-gradient(to top, #ff4422, #ffaa44, #ffdd66);
+            border-radius: 0 0 25px 25px;
+            transition: height 0.1s;
+        }
+        
+        #throttle-knob {
+            position: absolute;
+            width: 54px;
+            height: 54px;
+            background: radial-gradient(circle, #ffddaa 0%, #ff8844 100%);
+            border: 3px solid #ffcc88;
+            border-radius: 50%;
+            left: 3px;
+            box-shadow: 0 0 20px rgba(255, 100, 50, 0.8);
+        }
+        
+        #throttle-label {
+            position: absolute;
+            right: 75px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: rgba(255, 150, 100, 0.8);
+            font-size: 10px;
+            font-weight: bold;
+            writing-mode: vertical-rl;
+        }
+        
+        /* 功能按钮 */
+        .func-btn {
+            position: absolute;
+            width: 55px;
+            height: 55px;
+            background: rgba(100, 200, 255, 0.2);
+            border: 2px solid rgba(100, 200, 255, 0.5);
+            border-radius: 50%;
+            color: #ccffff;
+            font-size: 11px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: auto;
+            touch-action: none;
+            text-align: center;
+            line-height: 1.2;
+            backdrop-filter: blur(2px);
+        }
+        
+        .func-btn:active { 
+            background: rgba(100, 200, 255, 0.5); 
+            transform: scale(0.92);
+        }
+        
+        #btn-gear { bottom: 180px; right: 100px; }
+        #btn-flaps { bottom: 110px; right: 100px; }
+        #btn-brake { bottom: 40px; right: 100px; }
+        #btn-cam { top: 80px; right: 15px; font-size: 10px; }
+        #btn-reset { top: 150px; right: 15px; font-size: 10px; }
+        
+        /* 姿态仪 */
+        #attitude-indicator {
+            position: absolute;
+            bottom: 80px;
+            right: 15px;
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.5);
+            border: 2px solid rgba(100, 200, 255, 0.4);
+            overflow: hidden;
+            pointer-events: none;
+        }
+        
+        #attitude-sky {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 50%;
+            background: linear-gradient(to bottom, #2266aa, #4488cc);
+        }
+        
+        #attitude-ground {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 50%;
+            background: linear-gradient(to top, #446622, #668844);
+        }
+        
+        #horizon-line {
+            position: absolute;
+            top: 50%;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: #ffaa44;
+            transform-origin: center;
+        }
+        
+        .attitude-plane {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 30px;
+            height: 4px;
+            background: #ffff00;
+            border-radius: 2px;
+        }
+        
+        .attitude-plane::before,
+        .attitude-plane::after {
+            content: '';
+            position: absolute;
+            top: -8px;
+            width: 12px;
+            height: 12px;
+            border: 2px solid #ffff00;
+            border-bottom: none;
+            border-radius: 50% 50% 0 0;
+        }
+        .attitude-plane::before { left: -10px; }
+        .attitude-plane::after { right: -10px; }
+        
+        /* 状态指示器 */
+        #status-panel {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            pointer-events: none;
+        }
+        
+        .status-text {
+            font-size: 14px;
+            font-weight: bold;
+            color: #ff4444;
+            text-shadow: 0 0 10px rgba(255, 0, 0, 0.8);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        
+        .status-text.active { opacity: 1; }
+        
+        /* 破风效果层 */
+        #wind-effect {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 50;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        
+        .wind-line {
+            position: absolute;
+            background: linear-gradient(to bottom, transparent, rgba(255,255,255,0.3), transparent);
+            width: 2px;
+            animation: windMove 0.5s linear infinite;
+        }
+        
+        @keyframes windMove {
+            from { transform: translateY(-100vh); }
+            to { transform: translateY(100vh); }
+        }
+        
+        /* 加载画面 */
+        #loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000810;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #88ccff;
+        }
+        
+        .loading-spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid rgba(100, 200, 255, 0.2);
+            border-top-color: #88ccff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+        
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        #loading-bar {
+            width: 200px;
+            height: 4px;
+            background: rgba(100, 200, 255, 0.2);
+            border-radius: 2px;
+            margin-top: 15px;
+            overflow: hidden;
+        }
+        
+        #loading-fill {
+            height: 100%;
+            width: 0%;
+            background: #88ccff;
+            border-radius: 2px;
+            transition: width 0.3s;
+        }
+        
+        /* 消息提示 */
+        #message {
+            position: fixed;
+            top: 35%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.85);
+            color: #ffcc00;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            z-index: 200;
+            display: none;
+            border: 1px solid #ffcc00;
+            text-align: center;
+            max-width: 85%;
+            box-shadow: 0 0 20px rgba(255, 200, 0, 0.3);
+        }
+        
+        /* 失重指示 */
+        #gforce-indicator {
+            position: absolute;
+            bottom: 170px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+        }
+        
+        #gforce-value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #ff6644;
+            text-shadow: 0 0 8px rgba(255, 100, 50, 0.6);
+        }
+        
+        /* 警告闪烁 */
+        @keyframes warningFlash {
+            0%, 100% { opacity: 0; }
+            50% { opacity: 1; }
+        }
+        
+        .warning {
+            animation: warningFlash 0.5s infinite;
+            color: #ff0000 !important;
+        }
+        
+        /* 仅在手机显示控制 */
+        @media (min-width: 769px) {
+            #mobile-controls .control-zone,
+            .func-btn {
+                opacity: 0.7;
+            }
+            #mobile-controls .control-zone:hover,
+            .func-btn:hover {
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div id="loading">
+    <div class="loading-spinner"></div>
+    <h2>真实飞行模拟器</h2>
+    <p>正在生成世界...</p>
+    <div id="loading-bar"><div id="loading-fill"></div></div>
+</div>
+
+<canvas id="gameCanvas"></canvas>
+
+<div id="wind-effect"></div>
+
+<div id="ui">
+    <div class="hud-panel" id="altimeter">
+        <div class="hud-label">高度 ALT</div>
+        <div class="hud-value" id="altText">0000</div>
+        <div style="font-size:9px">米</div>
+        <div class="bar-container"><div class="bar-fill altitude-bar" id="altBar"></div></div>
+        <div style="font-size:9px;margin-top:2px;color:#88aacc" id="vspdText">V/S: 0</div>
+    </div>
+    
+    <div class="hud-panel" id="speedometer">
+        <div class="hud-label">空速 IAS</div>
+        <div class="hud-value" id="spdText">000</div>
+        <div style="font-size:9px">km/h</div>
+        <div class="bar-container"><div class="bar-fill speed-bar" id="spdBar"></div></div>
+        <div style="font-size:9px;margin-top:2px;color:#ccaa88" id="machText">M 0.00</div>
+    </div>
+    
+    <div class="hud-panel" id="compass">
+        <div class="hud-value" style="font-size:20px" id="hdgText">000°</div>
+        <div style="font-size:9px;opacity:0.6;margin-top:2px" id="coordText">N:00000 E:00000</div>
+    </div>
+    
+    <div id="gforce-indicator">
+        <div style="font-size:9px;color:#ff8866">G-FORCE</div>
+        <div id="gforce-value">1.0G</div>
+    </div>
+    
+    <div id="attitude-indicator">
+        <div id="attitude-sky"></div>
+        <div id="attitude-ground"></div>
+        <div id="horizon-line"></div>
+        <div class="attitude-plane"></div>
+    </div>
+    
+    <div id="status-panel">
+        <div class="status-text" id="stallWarning">⚠ 失速警告</div>
+        <div class="status-text" id="overspeedWarning">⚠ 超速警告</div>
+        <div class="status-text" id="pullUpWarning">⚠ 拉起! PULL UP!</div>
+    </div>
+</div>
+
+<div id="mobile-controls">
+    <div class="control-zone" id="stick-zone">
+        <div id="stick-knob"></div>
+    </div>
+    
+    <div class="control-zone" id="throttle-zone">
+        <div id="throttle-bg">
+            <div id="throttle-fill"></div>
+        </div>
+        <div id="throttle-knob"></div>
+        <div id="throttle-label">油门</div>
+    </div>
+    
+    <div class="func-btn" id="btn-gear">起落架</div>
+    <div class="func-btn" id="btn-flaps">襟翼</div>
+    <div class="func-btn" id="btn-brake">刹车</div>
+    <div class="func-btn" id="btn-cam">视角</div>
+    <div class="func-btn" id="btn-reset">重置</div>
+</div>
+
+<div id="message"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ==========================================
+// 真实飞行模拟器 3D - 终极版
+// 第一人称 | 真实物理 | 手机操控 | 失重/破风效果
+// ==========================================
+
+class FlightSimulator {
+    constructor() {
+        this.canvas = document.getElementById('gameCanvas');
+        this.scene = null;
+        this.camera = null;
+        this.renderer = null;
+        
+        // 飞机状态
+        this.plane = {
+            position: new THREE.Vector3(0, 200, 0),
+            velocity: new THREE.Vector3(0, 0, 80),
+            rotation: new THREE.Euler(0, 0, 0),
+            speed: 300,
+            throttle: 0.7,
+            altitude: 200,
+            heading: 0,
+            gearDown: true,
+            flaps: 0,
+            brakes: false,
+            pitch: 0,
+            roll: 0,
+            yaw: 0,
+            gForce: 1.0,
+            stallWarning: false,
+            overspeed: false
+        };
+        
+        // 输入
+        this.input = { pitch: 0, roll: 0, yaw: 0, throttle: 0.7 };
+        this.inputSmooth = { pitch: 0, roll: 0, yaw: 0 };
+        
+        // 地形
+        this.terrainChunks = new Map();
+        this.chunkSize = 1200;
+        this.chunkSeg = 50;
+        this.viewDist = 5;
+        
+        // 机场
+        this.airports = [];
+        
+        // 相机
+        this.cameraMode = 0; // 0=驾驶舱, 1=外部跟随, 2=外部环绕
+        this.cameraShake = 0;
+        this.cameraOffset = new THREE.Vector3();
+        
+        // 特效
+        this.windParticles = [];
+        this.clouds = [];
+        this.time = 0;
+        
+        // 渲染
+        this.clock = new THREE.Clock();
+        
+        this.init();
+    }
+    
+    init() {
+        // Three.js 初始化
+        this.scene = new THREE.Scene();
+        this.scene.background = new THREE.Color(0x6bb6ff);
+        this.scene.fog = new THREE.Fog(0x6bb6ff, 300, 10000);
+        
+        this.camera = new THREE.PerspectiveCamera(
+            80, 
+            window.innerWidth / window.innerHeight, 
+            0.1, 
+            25000
+        );
+        
+        this.renderer = new THREE.WebGLRenderer({ 
+            canvas: this.canvas, 
+            antialias: true,
+            powerPreference: "high-performance"
+        });
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+        this.renderer.shadowMap.enabled = true;
+        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        this.renderer.toneMappingExposure = 1.1;
+        
+        // 光照
+        this.setupLighting();
+        
+        // 创建世界
+        this.createWorld();
+        
+        // 控制
+        this.setupControls();
+        
+        // 开始
+        this.animate();
+        
+        // 加载进度
+        this.simulateLoading();
+        
+        window.addEventListener('resize', () => this.onResize());
+    }
+    
+    simulateLoading() {
+        const fill = document.getElementById('loading-fill');
+        let pct = 0;
+        const interval = setInterval(() => {
+            pct += 15;
+            fill.style.width = pct + '%';
+            if (pct >= 100) {
+                clearInterval(interval);
+                setTimeout(() => {
+                    document.getElementById('loading').style.display = 'none';
+                    this.showMessage('欢迎来到真实飞行模拟器！\n拖动左侧摇杆控制飞机\n拖动右侧滑条控制油门');
+                }, 300);
+            }
+        }, 200);
+    }
+    
+    setupLighting() {
+        // 环境光
+        const ambient = new THREE.AmbientLight(0x6688bb, 0.6);
+        this.scene.add(ambient);
+        
+        // 太阳光
+        this.sunLight = new THREE.DirectionalLight(0xfff8e7, 1.4);
+        this.sunLight.position.set(2000, 5000, 1500);
+        this.sunLight.castShadow = true;
+        this.sunLight.shadow.mapSize.set(2048, 2048);
+        this.sunLight.shadow.camera.near = 100;
+        this.sunLight.shadow.camera.far = 12000;
+        const d = 5000;
+        this.sunLight.shadow.camera.left = -d;
+        this.sunLight.shadow.camera.right = d;
+        this.sunLight.shadow.camera.top = d;
+        this.sunLight.shadow.camera.bottom = -d;
+        this.sunLight.shadow.bias = -0.0001;
+        this.scene.add(this.sunLight);
+        
+        // 半球光
+        const hemi = new THREE.HemisphereLight(0x87CEEB, 0x3a5a2a, 0.7);
+        this.scene.add(hemi);
+    }
+    
+    // 噪声函数
+    noise(x, z) {
+        return Math.sin(x * 0.01) * Math.cos(z * 0.01) * 50 +
+               Math.sin(x * 0.03 + 1.7) * Math.cos(z * 0.03) * 25 +
+               Math.sin(x * 0.1) * Math.cos(z * 0.1) * 5;
+    }
+    
+    getHeight(x, z) {
+        let h = this.noise(x, z);
+        
+        // 山脉
+        const m = Math.sin(x * 0.001 + 2) * Math.cos(z * 0.001);
+        if (m > 0.3) h += m * 500;
+        
+        // 起始区域平坦
+        if (Math.abs(x) < 1000 && Math.abs(z) < 1000) h *= 0.3;
+        
+        // 机场区域
+        for (const ap of this.airports) {
+            const dx = x - ap.x, dz = z - ap.z;
+            if (dx*dx + dz*dz < 250000) return 0;
+        }
+        
+        return Math.max(h, -5);
+    }
+    
+    createWorld() {
+        // 生成初始地形
+        for (let x = -2; x <= 2; x++) {
+            for (let z = -2; z <= 2; z++) {
+                this.generateChunk(x, z);
+            }
+        }
+        
+        // 机场
+        this.createAirport(0, 0, "中央国际机场");
+        this.createAirport(3500, 2500, "东方机场");
+        this.createAirport(-2500, 3000, "北方机场");
+        
+        // 天空
+        this.createSky();
+        
+        // 云层
+        this.createClouds();
+    }
+    
+    generateChunk(cx, cz) {
+        const key = `${cx},${cz}`;
+        if (this.terrainChunks.has(key)) return;
+        
+        const chunk = new THREE.Group();
+        const size = this.chunkSize;
+        const seg = this.chunkSeg;
+        
+        // 计算高度
+        const heights = [];
+        for (let x = 0; x <= seg; x++) {
+            heights[x] = [];
+            for (let z = 0; z <= seg; z++) {
+                const wx = cx * size + (x/seg - 0.5) * size;
+                const wz = cz * size + (z/seg - 0.5) * size;
+                heights[x][z] = this.getHeight(wx, wz);
+            }
+        }
+        
+        // 几何体
+        const geom = new THREE.PlaneGeometry(size, size, seg, seg);
+        const pos = geom.attributes.position;
+        const colors = [];
+        
+        for (let i = 0; i < pos.count; i++) {
+            const x = i % (seg + 1);
+            const z = Math.floor(i / (seg + 1));
+            const h = heights[x][z];
+            pos.setZ(i, h);
+            
+            // 顶点颜色
+            let r, g, b;
+            if (h < 2) { // 水边/沙滩
+                r = 0.75; g = 0.7; b = 0.5;
+            } else if (h < 80) { // 草地
+                const green = 0.4 + Math.sin(x * 0.5) * 0.05;
+                r = 0.25; g = green; b = 0.15;
+            } else if (h < 250) { // 森林
+                r = 0.15; g = 0.35; b = 0.1;
+            } else if (h < 500) { // 岩石
+                r = 0.55; g = 0.5; b = 0.45;
+            } else { // 雪
+                r = 0.92; g = 0.92; b = 0.95;
+            }
+            
+            // 随机变化
+            const v = (Math.random() - 0.5) * 0.04;
+            colors.push(Math.max(0, r+v), Math.max(0, g+v), Math.max(0, b+v));
+        }
+        
+        geom.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+        geom.computeVertexNormals();
+        
+        const mat = new THREE.MeshStandardMaterial({
+            vertexColors: true,
+            roughness: 0.92,
+            metalness: 0.0,
+            side: THREE.DoubleSide
+        });
+        
+        const mesh = new THREE.Mesh(geom, mat);
+        mesh.rotation.x = -Math.PI / 2;
+        mesh.position.set(cx * size, 0, cz * size);
+        mesh.receiveShadow = true;
+        mesh.castShadow = true;
+        chunk.add(mesh);
+        
+        // 添加细节
+        this.addDetails(chunk, cx, cz, heights, size, seg);
+        
+        this.scene.add(chunk);
+        this.terrainChunks.set(key, chunk);
+    }
+    
+    addDetails(chunk, cx, cz, heights, size, seg) {
+        // 树木
+        const treeMat = new THREE.MeshStandardMaterial({ color: 0x1a6a1a });
+        const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5a3a20 });
+        
+        for (let i = 0; i < 25; i++) {
+            const lx = Math.random() * size;
+            const lz = Math.random() * size;
+            const gx = cx * size + lx - size/2;
+            const gz = cz * size + lz - size/2;
+            
+            const gx_idx = Math.floor((lx/size) * seg);
+            const gz_idx = Math.floor((lz/size) * seg);
+            const h = heights[Math.min(gx_idx, seg)][Math.min(gz_idx, seg)];
+            
+            if (h > 40 && h < 350) {
+                const group = new THREE.Group();
+                
+                // 树干
+                const trunk = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.4, 0.6, 6, 5),
+                    trunkMat
+                );
+                trunk.position.y = 3;
+                trunk.castShadow = true;
+                group.add(trunk);
+                
+                // 树冠 (多层圆锥)
+                for (let l = 0; l < 3; l++) {
+                    const foliage = new THREE.Mesh(
+                        new THREE.ConeGeometry(3 - l*0.6, 5, 7),
+                        treeMat
+                    );
+                    foliage.position.y = 6 + l * 3;
+                    foliage.castShadow = true;
+                    group.add(foliage);
+                }
+                
+                group.position.set(gx, h, gz);
+                const s = 0.8 + Math.random() * 0.5;
+                group.scale.set(s, s * (0.9 + Math.random() * 0.3), s);
+                group.rotation.y = Math.random() * Math.PI * 2;
+                chunk.add(group);
+            }
+        }
+        
+        // 岩石
+        const rockMat = new THREE.MeshStandardMaterial({ color: 0x666666, roughness: 0.95 });
+        for (let i = 0; i < 12; i++) {
+            const lx = Math.random() * size;
+            const lz = Math.random() * size;
+            const gx = cx * size + lx - size/2;
+            const gz = cz * size + lz - size/2;
+            
+            const gx_idx = Math.floor((lx/size) * seg);
+            const gz_idx = Math.floor((lz/size) * seg);
+            const h = heights[Math.min(gx_idx, seg)][Math.min(gz_idx, seg)];
+            
+            if (h > 80) {
+                const rock = new THREE.Mesh(
+                    new THREE.DodecahedronGeometry(2 + Math.random() * 3, 0),
+                    rockMat
+                );
+                rock.position.set(gx, h + 1.5, gz);
+                rock.rotation.set(Math.random()*3, Math.random()*3, Math.random()*3);
+                rock.castShadow = true;
+                rock.receiveShadow = true;
+                chunk.add(rock);
+            }
+        }
+        
+        // 草/花 (小平面)
+        const grassMat = new THREE.MeshStandardMaterial({ 
+            color: 0x44aa22, 
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 0.8
+        });
+        for (let i = 0; i < 40; i++) {
+            const lx = Math.random() * size;
+            const lz = Math.random() * size;
+            const gx = cx * size + lx - size/2;
+            const gz = cz * size + lz - size/2;
+            
+            const gx_idx = Math.floor((lx/size) * seg);
+            const gz_idx = Math.floor((lz/size) * seg);
+            const h = heights[Math.min(gx_idx, seg)][Math.min(gz_idx, seg)];
+            
+            if (h > 20 && h < 200) {
+                const grass = new THREE.Mesh(
+                    new THREE.PlaneGeometry(1 + Math.random(), 2 + Math.random()),
+                    grassMat
+                );
+                grass.position.set(gx, h + 1, gz);
+                grass.rotation.y = Math.random() * Math.PI;
+                chunk.add(grass);
+            }
+        }
+    }
+    
+    createAirport(x, z, name) {
+        this.airports.push({ x, z, name });
+        const group = new THREE.Group();
+        
+        const runwayLen = 500;
+        const runwayWid = 45;
+        
+        // 跑道沥青
+        const runway = new THREE.Mesh(
+            new THREE.BoxGeometry(runwayLen, 0.6, runwayWid),
+            new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.95 })
+        );
+        runway.position.y = 0.3;
+        runway.receiveShadow = true;
+        group.add(runway);
+        
+        // 跑道标记
+        const lineMat = new THREE.MeshStandardMaterial({ color: 0xeeeeee });
+        for (let i = -runwayLen/2 + 35; i < runwayLen/2; i += 70) {
+            const line = new THREE.Mesh(new THREE.BoxGeometry(25, 0.7, 1.2), lineMat);
+            line.position.set(i, 0.35, 0);
+            group.add(line);
+        }
+        
+        // 跑道边灯
+        const lightMat = new THREE.MeshStandardMaterial({ 
+            color: 0xffff00, emissive: 0xffff00, emissiveIntensity: 2 
+        });
+        for (let side of [-1, 1]) {
+            for (let i = -runwayLen/2; i <= runwayLen/2; i += 35) {
+                const light = new THREE.Mesh(new THREE.SphereGeometry(0.35), lightMat);
+                light.position.set(i, 0.5, side * runwayWid/2);
+                group.add(light);
+                
+                const pl = new THREE.PointLight(0xffff00, 0.2, 12);
+                pl.position.copy(light.position);
+                group.add(pl);
+            }
+        }
+        
+        // 停机坪
+        const apron = new THREE.Mesh(
+            new THREE.BoxGeometry(120, 0.5, 120),
+            new THREE.MeshStandardMaterial({ color: 0x3a3a3a })
+        );
+        apron.position.set(-runwayLen/2 - 80, 0.25, 0);
+        apron.receiveShadow = true;
+        group.add(apron);
+        
+        // 航站楼
+        const terminal = new THREE.Mesh(
+            new THREE.BoxGeometry(80, 22, 50),
+            new THREE.MeshStandardMaterial({ color: 0xdddddd, metalness: 0.3, roughness: 0.5 })
+        );
+        terminal.position.set(-runwayLen/2 - 80, 11, 0);
+        terminal.castShadow = true;
+        group.add(terminal);
+        
+        // 窗户
+        const winMat = new THREE.MeshPhysicalMaterial({
+            color: 0x88ccff, metalness: 0.8, roughness: 0.1,
+            transmission: 0.6, transparent: true
+        });
+        for (let f = 0; f < 3; f++) {
+            const win = new THREE.Mesh(new THREE.BoxGeometry(70, 5, 52), winMat);
+            win.position.set(-runwayLen/2 - 80, 7 + f * 7, 0);
+            group.add(win);
+        }
+        
+        // 控制塔
+        const tower = new THREE.Mesh(
+            new THREE.CylinderGeometry(5, 7, 30, 8),
+            new THREE.MeshStandardMaterial({ color: 0xcccccc })
+        );
+        tower.position.set(-runwayLen/2 - 20, 15, 70);
+        tower.castShadow = true;
+        group.add(tower);
+        
+        const cab = new THREE.Mesh(
+            new THREE.CylinderGeometry(9, 6, 7, 8),
+            new THREE.MeshPhysicalMaterial({ color: 0xaaddff, transparent: true, opacity: 0.4 })
+        );
+        cab.position.set(-runwayLen/2 - 20, 33.5, 70);
+        group.add(cab);
+        
+        // 塔灯
+        const beacon = new THREE.PointLight(0xff0000, 1.5, 60);
+        beacon.position.set(-runwayLen/2 - 20, 40, 70);
+        group.add(beacon);
+        
+        // 红色闪烁球
+        const beaconMesh = new THREE.Mesh(
+            new THREE.SphereGeometry(1),
+            new THREE.MeshStandardMaterial({ color: 0xff0000, emissive: 0xff0000, emissiveIntensity: 3 })
+        );
+        beaconMesh.position.copy(beacon.position);
+        group.add(beaconMesh);
+        
+        group.position.set(x, 0, z);
+        this.scene.add(group);
+    }
+    
+    createSky() {
+        // 天空球
+        const skyGeom = new THREE.SphereGeometry(20000, 20, 20);
+        const skyMat = new THREE.MeshBasicMaterial({
+            color: 0x6bb6ff,
+            side: THREE.BackSide,
+            fog: false
+        });
+        this.sky = new THREE.Mesh(skyGeom, skyMat);
+        this.scene.add(this.sky);
+        
+        // 太阳
+        const sunGeom = new THREE.SphereGeometry(300, 16, 16);
+        const sunMat = new THREE.MeshBasicMaterial({ 
+            color: 0xfff8e0,
+            fog: false 
+        });
+        this.sun = new THREE.Mesh(sunGeom, sunMat);
+        this.sun.position.set(8000, 6000, 4000);
+        this.scene.add(this.sun);
+        
+        // 太阳光晕
+        const glowGeom = new THREE.SphereGeometry(600, 16, 16);
+        const glowMat = new THREE.MeshBasicMaterial({
+            color: 0xfff8e0,
+            transparent: true,
+            opacity: 0.15,
+            fog: false
+        });
+        this.sunGlow = new THREE.Mesh(glowGeom, glowMat);
+        this.sunGlow.position.copy(this.sun.position);
+        this.scene.add(this.sunGlow);
+    }
+    
+    createClouds() {
+        const cloudMat = new THREE.MeshStandardMaterial({
+            color: 0xffffff,
+            transparent: true,
+            opacity: 0.85,
+            roughness: 1,
+            depthWrite: false
+        });
+        
+        for (let i = 0; i < 30; i++) {
+            const cloud = new THREE.Group();
+            
+            // 多个球组成一朵云
+            const blobs = 3 + Math.floor(Math.random() * 5);
+            for (let b = 0; b < blobs; b++) {
+                const blob = new THREE.Mesh(
+                    new THREE.SphereGeometry(
+                        80 + Math.random() * 150, 
+                        8, 8
+                    ),
+                    cloudMat
+                );
+                blob.position.set(
+                    (Math.random() - 0.5) * 300,
+                    (Math.random() - 0.5) * 50,
+                    (Math.random() - 0.5) * 200
+                );
+                blob.scale.y = 0.4 + Math.random() * 0.3;
+                cloud.add(blob);
+            }
+            
+            cloud.position.set(
+                (Math.random() - 0.5) * 15000,
+                1500 + Math.random() * 3000,
+                (Math.random() - 0.5) * 15000
+            );
+            
+            this.scene.add(cloud);
+            this.clouds.push({
+                mesh: cloud,
+                speed: 5 + Math.random() * 10,
+                baseY: cloud.position.y
+            });
+        }
+    }
+    
+    // ============ 控制系统 ============
+    
+    setupControls() {
+        // 键盘
+        const keys = {};
+        document.addEventListener('keydown', (e) => {
+            keys[e.key.toLowerCase()] = true;
+            switch(e.key.toLowerCase()) {
+                case 'g': this.toggleGear(); break;
+                case 'f': this.toggleFlaps(); break;
+                case 'b': this.plane.brakes = true; break;
+                case 'c': this.cycleCamera(); break;
+                case ' ': this.resetPlane(); break;
+            }
+        });
+        document.addEventListener('keyup', (e) => {
+            keys[e.key.toLowerCase()] = false;
+            if (e.key.toLowerCase() === 'b') this.plane.brakes = false;
+        });
+        
+        this.processKeys = () => {
+            const s = 0.025;
+            if (keys['w'] || keys['arrowup']) this.input.pitch = Math.max(-1, this.input.pitch - s);
+            else if (keys['s'] || keys['arrowdown']) this.input.pitch = Math.min(1, this.input.pitch + s);
+            else this.input.pitch *= 0.94;
+            
+            if (keys['a'] || keys['arrowleft']) this.input.roll = Math.min(1, this.input.roll + s);
+            else if (keys['d'] || keys['arrowright']) this.input.roll = Math.max(-1, this.input.roll - s);
+            else this.input.roll *= 0.94;
+            
+            if (keys['q']) this.input.yaw = Math.max(-1, this.input.yaw - s);
+            else if (keys['e']) this.input.yaw = Math.min(1, this.input.yaw + s);
+            else this.input.yaw *= 0.94;
+            
+            if (keys['shift']) this.input.throttle = Math.min(1, this.input.throttle + 0.015);
+            else if (keys['control']) this.input.throttle = Math.max(0, this.input.throttle - 0.015);
+        };
+        
+        // 手机虚拟摇杆
+        this.setupVirtualStick();
+        
+        // 手机油门
+        this.setupThrottle();
+        
+        // 手机按钮
+        this.setupMobileButtons();
+    }
+    
+    setupVirtualStick() {
+        const zone = document.getElementById('stick-zone');
+        const knob = document.getElementById('stick-knob');
+        let active = false;
+        let centerX, centerY;
+        const maxDist = 40;
+        
+        const start = (clientX, clientY) => {
+            const rect = zone.getBoundingClientRect();
+            centerX = rect.left + rect.width / 2;
+            centerY = rect.top + rect.height / 2;
+            active = true;
+            zone.style.background = 'radial-gradient(circle, rgba(100,200,255,0.3) 0%, rgba(100,200,255,0.1) 70%, transparent 100%)';
+        };
+        
+        const move = (clientX, clientY) => {
+            if (!active) return;
+            
+            let dx = clientX - centerX;
+            let dy = clientY - centerY;
+            const dist = Math.sqrt(dx*dx + dy*dy);
+            
+            if (dist > maxDist) {
+                const ratio = maxDist / dist;
+                dx *= ratio;
+                dy *= ratio;
+            }
+            
+            knob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+            
+            // 映射到飞机控制 (注意：dy向上为负，但飞机向上应为负pitch)
+            this.input.roll = -dx / maxDist;
+            this.input.pitch = dy / maxDist;
+        };
+        
+        const end = () => {
+            active = false;
+            knob.style.transform = 'translate(-50%, -50%)';
+            this.input.roll = 0;
+            this.input.pitch = 0;
+            zone.style.background = 'radial-gradient(circle, rgba(100,200,255,0.15) 0%, rgba(100,200,255,0.05) 70%, transparent 100%)';
+        };
+        
+        // 鼠标事件
+        zone.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            start(e.clientX, e.clientY);
+        });
+        
+        document.addEventListener('mousemove', (e) => {
+            move(e.clientX, e.clientY);
+        });
+        
+        document.addEventListener('mouseup', end);
+        
+        // 触摸事件 - 关键！必须绑定到zone和document
+        zone.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const t = e.touches[0];
+            start(t.clientX, t.clientY);
+        }, { passive: false });
+        
+        zone.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if (e.touches.length > 0) {
+                move(e.touches[0].clientX, e.touches[0].clientY);
+            }
+        }, { passive: false });
+        
+        zone.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            end();
+        });
+        
+        zone.addEventListener('touchcancel', (e) => {
+            e.preventDefault();
+            end();
+        });
+    }
+    
+    setupThrottle() {
+        const zone = document.getElementById('throttle-zone');
+        const fill = document.getElementById('throttle-fill');
+        const knob = document.getElementById('throttle-knob');
+        let active = false;
+        let zoneRect;
+        
+        const update = (clientY) => {
+            if (!zoneRect) zoneRect = zone.getBoundingClientRect();
+            const y = clientY - zoneRect.top;
+            const h = zoneRect.height;
+            
+            // 从底部计算 (0-1)
+            let pct = 1 - (y / h);
+            pct = Math.max(0, Math.min(1, pct));
+            
+            this.input.throttle = pct;
+            
+            fill.style.height = (pct * 100) + '%';
+            knob.style.bottom = `calc(${pct * 100}% - 27px)`;
+        };
+        
+        const start = (clientY) => {
+            active = true;
+            zoneRect = zone.getBoundingClientRect();
+            update(clientY);
+            zone.style.borderColor = 'rgba(255, 150, 100, 0.6)';
+        };
+        
+        const move = (clientY) => {
+            if (!active) return;
+            update(clientY);
+        };
+        
+        const end = () => {
+            active = false;
+            zone.style.borderColor = 'rgba(255, 100, 50, 0.25)';
+        };
+        
+        // 鼠标
+        zone.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            start(e.clientY);
+        });
+        
+        document.addEventListener('mousemove', (e) => {
+            move(e.clientY);
+        });
+        
+        document.addEventListener('mouseup', end);
+        
+        // 触摸
+        zone.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (e.touches.length > 0) {
+                start(e.touches[0].clientY);
+            }
+        }, { passive: false });
+        
+        zone.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if (active && e.touches.length > 0) {
+                move(e.touches[0].clientY);
+            }
+        }, { passive: false });
+        
+        zone.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            end();
+        });
+        
+        zone.addEventListener('touchcancel', (e) => {
+            e.preventDefault();
+            end();
+        });
+        
+        // 初始化位置
+        fill.style.height = '70%';
+        knob.style.bottom = 'calc(70% - 27px)';
+    }
+    
+    setupMobileButtons() {
+        const setupBtn = (id, action) => {
+            const btn = document.getElementById(id);
+            
+            const handler = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                action();
+            };
+            
+            btn.addEventListener('touchstart', handler, { passive: false });
+            btn.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                action();
+            });
+        };
+        
+        setupBtn('btn-gear', () => this.toggleGear());
+        setupBtn('btn-flaps', () => this.toggleFlaps());
+        setupBtn('btn-brake', () => {
+            this.plane.brakes = true;
+            setTimeout(() => { this.plane.brakes = false; }, 500);
+        });
+        setupBtn('btn-cam', () => this.cycleCamera());
+        setupBtn('btn-reset', () => this.resetPlane());
+    }
+    
+    toggleGear() {
+        this.plane.gearDown = !this.plane.gearDown;
+        this.showMessage(this.plane.gearDown ? '🛬 起落架放下' : '✈️ 起落架收起');
+    }
+    
+    toggleFlaps() {
+        this.plane.flaps = this.plane.flaps === 0 ? 1 : 0;
+        this.showMessage(this.plane.flaps > 0 ? '🛩 襟翼展开' : '✈️ 襟翼收起');
+    }
+    
+    cycleCamera() {
+        this.cameraMode = (this.cameraMode + 1) % 3;
+        const names = ['👨‍✈️ 驾驶舱视角', '🔭 外部跟随', '🎥 外部环绕'];
+        this.showMessage(names[this.cameraMode]);
+    }
+    
+    resetPlane() {
+        this.plane.position.set(0, 200, 0);
+        this.plane.velocity.set(0, 0, 80);
+        this.plane.rotation.set(0, 0, 0);
+        this.plane.speed = 300;
+        this.plane.pitch = 0;
+        this.plane.roll = 0;
+        this.plane.yaw = 0;
+        this.plane.gForce = 1.0;
+        this.input.pitch = 0;
+        this.input.roll = 0;
+        this.input.yaw = 0;
+        this.showMessage('🔄 位置重置');
+    }
+    
+    showMessage(text) {
+        const msg = document.getElementById('message');
+        msg.innerHTML = text.replace(/\n/g, '<br>');
+        msg.style.display = 'block';
+        clearTimeout(this.msgTimer);
+        this.msgTimer = setTimeout(() => {
+            msg.style.display = 'none';
+        }, 2500);
+    }
+    
+    // ============ 物理引擎 ============
+    
+    updatePhysics(dt) {
+        if (this.processKeys) this.processKeys();
+        
+        // 平滑输入
+        const smooth = 4 * dt;
+        this.inputSmooth.pitch += (this.input.pitch - this.inputSmooth.pitch) * smooth;
+        this.inputSmooth.roll += (this.input.roll - this.inputSmooth.roll) * smooth;
+        this.inputSmooth.yaw += (this.input.yaw - this.inputSmooth.yaw) * smooth;
+        this.plane.throttle += (this.input.throttle - this.plane.throttle) * smooth;
+        
+        // 计算G力 (基于转弯)
+        const turnRate = Math.abs(this.inputSmooth.roll) + Math.abs(this.inputSmooth.pitch);
+        const targetG = 1 + turnRate * 2;
+        this.plane.gForce += (targetG - this.plane.gForce) * 3 * dt;
+        
+        // 失重感 (下坠或负G)
+        const verticalAccel = this.plane.velocity.y;
+        if (verticalAccel < -20) {
+            this.plane.gForce = Math.max(0.3, this.plane.gForce - 0.5 * dt);
+        }
+        
+        // 应用旋转
+        const pitchRate = this.inputSmooth.pitch * 0.8;
+        const rollRate = this.inputSmooth.roll * 1.0;
+        const yawRate = this.inputSmooth.yaw * 0.4 - this.inputSmooth.roll * 0.2;
+        
+        this.plane.rotation.x += pitchRate * dt;
+        this.plane.rotation.z += rollRate * dt;
+        this.plane.rotation.y += yawRate * dt;
+        
+        // 稳定性 (自动回正)
+        this.plane.rotation.x *= (1 - 0.6 * dt);
+        this.plane.rotation.z *= (1 - 1.0 * dt);
+        
+        // 限制角度
+        this.plane.rotation.x = Math.max(-Math.PI/2.5, Math.min(Math.PI/2.5, this.plane.rotation.x));
+        this.plane.rotation.z = Math.max(-Math.PI/1.8, Math.min(Math.PI/1.8, this.plane.rotation.z));
+        
+        // 速度物理
+        const maxSpeed = 950;
+        const stallSpeed = 150;
+        const targetSpeed = stallSpeed + (maxSpeed - stallSpeed) * this.plane.throttle;
+        
+        // 高度影响
+        const altFactor = Math.max(0.25, 1 - this.plane.altitude / 12000);
+        
+        // 阻力计算
+        let drag = 1;
+        if (this.plane.gearDown) drag *= 1.08;
+        if (this.plane.flaps > 0) drag *= 1.05;
+        if (this.plane.brakes && this.plane.altitude < 15) drag *= 1.15;
+        
+        this.plane.speed += (targetSpeed * altFactor * drag - this.plane.speed) * 0.8 * dt;
+        this.plane.speed = Math.max(0, this.plane.speed);
+        
+        // 失速检测
+        let stallFactor = 1;
+        this.plane.stallWarning = false;
+        if (this.plane.speed < stallSpeed * 0.85) {
+            stallFactor = 0.4;
+            this.plane.stallWarning = true;
+            this.plane.rotation.x += dt * 0.4; // 机头下坠
+            this.plane.rotation.z += (Math.random() - 0.5) * dt * 0.3; // 抖动
+        }
+        
+        // 超速警告
+        this.plane.overspeed = this.plane.speed > 850;
+        
+        // 速度向量
+        const speedMS = this.plane.speed / 3.6;
+        const forward = new THREE.Vector3(
+            Math.cos(this.plane.rotation.x) * Math.cos(this.plane.rotation.y),
+            Math.sin(this.plane.rotation.x),
+            Math.cos(this.plane.rotation.x) * Math.sin(this.plane.rotation.y)
+        );
+        
+        // 升力计算
+        const liftCoeff = Math.max(0, (this.plane.speed - stallSpeed * 0.4) / 180) * 
+                          (1 + this.plane.flaps * 0.4) * stallFactor;
+        const lift = liftCoeff * 25;
+        const gravity = 9.81;
+        
+        // 垂直速度
+        const verticalSpeed = forward.y * speedMS + lift - gravity;
+        
+        this.plane.velocity.copy(forward).multiplyScalar(speedMS);
+        this.plane.velocity.y = verticalSpeed;
+        
+        // 更新位置
+        this.plane.position.add(this.plane.velocity.clone().multiplyScalar(dt));
+        
+        // 地面碰撞
+        const groundH = this.getHeight(this.plane.position.x, this.plane.position.z);
+        const planeBottom = this.plane.gearDown ? 4.5 : 2;
+        
+        if (this.plane.position.y < groundH + planeBottom) {
+            this.plane.position.y = groundH + planeBottom;
+            
+            if (this.plane.speed > 80 && !this.plane.gearDown) {
+                this.plane.speed *= 0.6;
+                this.showMessage('💥 硬着陆！起落架损坏！');
+            } else if (this.plane.speed > 40) {
+                this.plane.speed *= 0.92;
+            }
+            
+            if (this.plane.altitude < 10) {
+                this.plane.rotation.x *= 0.85;
+                this.plane.rotation.z *= 0.85;
+            }
+        }
+        
+        // 更新数据
+        this.plane.altitude = Math.max(0, this.plane.position.y - groundH);
+        this.plane.heading = ((this.plane.rotation.y * 180 / Math.PI) % 360 + 360) % 360;
+        
+        // 相机震动
+        this.cameraShake = (this.plane.speed / 900) * 0.15;
+        if (this.plane.stallWarning) this.cameraShake *= 3;
+        if (this.plane.altitude < 30) this.cameraShake *= 2;
+        if (this.plane.overspeed) this.cameraShake *= 1.5;
+    }
+    
+    // ============ 渲染 ============
+    
+    updateCamera() {
+        if (this.cameraMode === 0) {
+            // 驾驶舱第一人称
+            const pos = this.plane.position.clone();
+            
+            // 驾驶舱位置 (机头内)
+            const offset = new THREE.Vector3(6, 2.5, 0);
+            offset.applyEuler(this.plane.rotation);
+            pos.add(offset);
+            
+            // 震动
+            const shake = this.cameraShake;
+            pos.x += (Math.random() - 0.5) * shake;
+            pos.y += (Math.random() - 0.5) * shake;
+            pos.z += (Math.random() - 0.5) * shake;
+            
+            // 失重时相机轻微漂浮
+            if (this.plane.gForce < 0.8) {
+                pos.y += Math.sin(this.time * 3) * 0.3 * (1 - this.plane.gForce);
+            }
+            
+            this.camera.position.copy(pos);
+            
+            // 看向正前方
+            const lookDir = new THREE.Vector3(100, 0, 0);
+            lookDir.applyEuler(this.plane.rotation);
+            
+            // 加入俯仰/滚转的视觉反馈
+            const visualPitch = this.plane.rotation.x * 0.3;
+            const visualRoll = this.plane.rotation.z * 0.2;
+            lookDir.y += visualPitch;
+            lookDir.z += visualRoll;
+            
+            const lookAt = pos.clone().add(lookDir);
+            this.camera.lookAt(lookAt);
+            
+        } else if (this.cameraMode === 1) {
+            // 外部跟随
+            const offset = new THREE.Vector3(-50, 20, 0);
+            offset.applyEuler(this.plane.rotation);
+            const target = this.plane.position.clone().add(offset);
+            this.camera.position.lerp(target, 0.08);
+            this.camera.lookAt(this.plane.position);
+            
+        } else {
+            // 环绕
+            const t = this.time * 0.4;
+            const r = 100;
+            this.camera.position.x = this.plane.position.x + Math.cos(t) * r;
+            this.camera.position.y = this.plane.position.y + 40 + Math.sin(t * 0.5) * 20;
+            this.camera.position.z = this.plane.position.z + Math.sin(t) * r;
+            this.camera.lookAt(this.plane.position);
+        }
+    }
+    
+    updateTerrain() {
+        const cx = Math.floor(this.plane.position.x / this.chunkSize);
+        const cz = Math.floor(this.plane.position.z / this.chunkSize);
+        
+        for (let dx = -this.viewDist; dx <= this.viewDist; dx++) {
+            for (let dz = -this.viewDist; dz <= this.viewDist; dz++) {
+                this.generateChunk(cx + dx, cz + dz);
+            }
+        }
+        
+        // 清理
+        for (const [key, chunk] of this.terrainChunks) {
+            const [kx, kz] = key.split(',').map(Number);
+            if (Math.abs(kx - cx) > this.viewDist + 1 || 
+                Math.abs(kz - cz) > this.viewDist + 1) {
+                this.scene.remove(chunk);
+                this.terrainChunks.delete(key);
+            }
+        }
+    }
+    
+    updateClouds(dt) {
+        for (const cloud of this.clouds) {
+            cloud.mesh.position.x += cloud.speed * dt;
+            cloud.mesh.position.y = cloud.baseY + Math.sin(this.time * 0.3 + cloud.mesh.position.x * 0.001) * 100;
+            
+            // 循环
+            if (cloud.mesh.position.x > 10000) {
+                cloud.mesh.position.x = -10000;
+            }
+        }
+    }
+    
+    updateSky() {
+        // 天空颜色随高度变化
+        const alt = this.plane.altitude;
+        let skyColor;
+        if (alt < 1000) {
+            skyColor = new THREE.Color(0x6bb6ff);
+        } else if (alt < 5000) {
+            skyColor = new THREE.Color(0x5599dd);
+        } else if (alt < 10000) {
+            skyColor = new THREE.Color(0x3366aa);
+        } else {
+            skyColor = new THREE.Color(0x112244); // 高空深蓝
+        }
+        
+        this.scene.background.lerp(skyColor, 0.05);
+        this.scene.fog.color.copy(this.scene.background);
+        
+        // 太阳跟随
+        this.sun.position.x = this.plane.position.x + 5000;
+        this.sun.position.z = this.plane.position.z + 3000;
+        this.sunGlow.position.copy(this.sun.position);
+        
+        this.sunLight.position.copy(this.sun.position);
+        this.sunLight.target.position.copy(this.plane.position);
+        this.sunLight.target.updateMatrixWorld();
+    }
+    
+    updateUI() {
+        // 高度
+        document.getElementById('altText').textContent = Math.round(this.plane.altitude).toString().padStart(4, '0');
+        document.getElementById('altBar').style.width = Math.min(100, this.plane.altitude / 100) + '%';
+        document.getElementById('vspdText').textContent = 'V/S: ' + (this.plane.velocity.y * 60).toFixed(0) + ' ft/min';
+        
+        // 速度
+        document.getElementById('spdText').textContent = Math.round(this.plane.speed).toString().padStart(3, '0');
+        document.getElementById('spdBar').style.width = Math.min(100, this.plane.speed / 950 * 100) + '%';
+        document.getElementById('machText').textContent = 'M ' + (this.plane.speed / 1235).toFixed(2);
+        
+        // 航向
+        document.getElementById('hdgText').textContent = Math.round(this.plane.heading).toString().padStart(3, '0') + '°';
+        document.getElementById('coordText').textContent = 
+            'N:' + Math.round(this.plane.position.z).toString().padStart(5, '0') + 
+            ' E:' + Math.round(this.plane.position.x).toString().padStart(5, '0');
+        
+        // G力
+        const gEl = document.getElementById('gforce-value');
+        gEl.textContent = this.plane.gForce.toFixed(1) + 'G';
+        gEl.style.color = this.plane.gForce > 3 ? '#ff0000' : 
+                         this.plane.gForce > 2 ? '#ff6644' : 
+                         this.plane.gForce < 0.5 ? '#ff8844' : '#66ff88';
+        
+        // 姿态仪
+        const pitchDeg = this.plane.rotation.x * 180 / Math.PI;
+        const rollDeg = this.plane.rotation.z * 180 / Math.PI;
+        document.getElementById('horizon-line').style.transform = 
+            `translateY(${pitchDeg * 0.4}px) rotate(${-rollDeg}deg)`;
+        
+        // 警告
+        document.getElementById('stallWarning').className = 
+            'status-text' + (this.plane.stallWarning ? ' active' : '');
+        document.getElementById('overspeedWarning').className = 
+            'status-text' + (this.plane.overspeed ? ' active' : '');
+        
+        const pullUp = this.plane.altitude < 80 && this.plane.velocity.y < -10 && !this.plane.gearDown;
+        document.getElementById('pullUpWarning').className = 
+            'status-text' + (pullUp ? ' active warning' : '');
+        
+        // 破风效果
+        const windEl = document.getElementById('wind-effect');
+        if (this.plane.speed > 600 || (this.plane.speed > 400 && this.plane.altitude < 100)) {
+            windEl.style.opacity = Math.min(1, (this.plane.speed - 400) / 400);
+        } else {
+            windEl.style.opacity = 0;
+        }
+    }
+    
+    animate() {
+        requestAnimationFrame(() => this.animate());
+        
+        const dt = Math.min(this.clock.getDelta(), 0.05);
+        this.time += dt;
+        
+        this.updatePhysics(dt);
+        this.updateCamera();
+        this.updateTerrain();
+        this.updateClouds(dt);
+        this.updateSky();
+        this.updateUI();
+        
+        this.renderer.render(this.scene, this.camera);
+    }
+    
+    onResize() {
+        this.camera.aspect = window.innerWidth / window.innerHeight;
+        this.camera.updateProjectionMatrix();
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+}
+
+// 启动
+window.addEventListener('load', () => {
+    new FlightSimulator();
+});
+</script>
+
+</body>
+</html>
