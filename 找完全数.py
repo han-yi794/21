@@ -1,6 +1,10 @@
 import sys
 import math
 
+# 解除整数转字符串的长度限制（Python 3.11+）
+sys.set_int_max_str_digits(0)
+
+# 其余原有代码保持不变...
 def is_prime(n: int) -> bool:
     """简单试除法判断正整数是否为素数（n较小）"""
     if n < 2:
